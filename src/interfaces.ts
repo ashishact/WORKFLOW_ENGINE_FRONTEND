@@ -64,6 +64,7 @@ export const TemporalHistoryEventC = t.type({
             t.literal("ActivityTaskStarted"),
             t.literal("ActivityTaskCompleted"),
             t.literal("WorkflowExecutionCompleted"),
+            t.literal("WorkflowTaskFailed"),
         ]),
         eventId: t.string,
         details: t.any
@@ -75,6 +76,31 @@ export const TemporalHistoryC = t.type({
         events: t.array(TemporalHistoryEventC)
     })
 });
+export const TemporalStatusC = t.type({
+    pendingActivities: t.array(t.type({
+        activityId: t.string,
+        activityType: t.type({
+            name: t.string
+        }),
+        state: t.string,
+        attempt: t.number,
+        maximumAttempts: t.number,
+        lastFailure: t.union([
+            t.null,
+            t.type({
+                message: t.string,
+                source: t.string
+            })
+        ])
+    })),
+    workflowExecutionInfo: t.type({
+        startTime: t.string,
+        status: t.string,
+        historyLength: t.string,
+        executionTime: t.string
+    })
+});
 
 export type TemporalHistoryI = t.TypeOf<typeof TemporalHistoryC>;
 export type TemporalHistoryEventI = t.TypeOf<typeof TemporalHistoryEventC>;
+export type TemporalStatusI = t.TypeOf<typeof TemporalStatusC>;

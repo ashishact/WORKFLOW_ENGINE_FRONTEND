@@ -1,4 +1,4 @@
-import React, {useState, useRef}      from 'react';
+import React, {useState, useRef, useEffect}      from 'react';
 import logo                 from './logo.svg';
 import './App.css';
 
@@ -9,26 +9,43 @@ import axios,
 
 import {STATUS, decode, 
     TemporalHistoryC,
-    TemporalHistoryEventI
+    TemporalHistoryEventI,
+    TemporalStatusC,
+    TemporalStatusI
 }                           from "./interfaces";
 import defaultValues                from "./default_values";
 
 const WARN  = console.warn;
 const LOG   = console.log;
 
-const SERVICE_API_ROOT = "http://localhost:3000/api/v1";
+const SERVICE_API_ROOT = "http://localhost:3014/api/v1";
 
 interface StatusI{
     id: string,
     type: string,
     time: string
 }
+enum RUNNIG_STATUS {
+    NONE,
+    RUNNING,
+    COMPLETED,
+    TERMINATED
+}
+
+let run_s:RUNNIG_STATUS = RUNNIG_STATUS.NONE;
+
 function App() {
 
     const editorRef = useRef<any>(null);
     const [wfState, setWfState] = useState<string>("BEFORE INIT");
-    const [status, setStatus] = useState<TemporalHistoryEventI[]|null>([]);
+    const [history, setHistory] = useState<TemporalHistoryEventI[]|null>([]);
+    const [status, setStatus] = useState<RUNNIG_STATUS>(RUNNIG_STATUS.NONE);
+    const [runIds, setRunIds] = useState<any>(null);
 
+
+    useEffect(() => {
+        
+    }, [status]);
 
     const handleEditorDidMount = (editor:any , monaco: any) => {
         editorRef.current = editor; 
@@ -50,14 +67,18 @@ function App() {
             WARN(err);
             return false;
         }
+        
+        setWfState("POSTED: " + JSON.stringify(r.data.data));
+        setStatus(RUNNIG_STATUS.NONE);
+        setHistory(null);
 
         LOG(r);
         if(r.data.status === STATUS.success){
             if(r.data.data?.length){
                 let data = r.data.data[0];
-                pollStatus(data.runId, data.workflowId); // Pass the ID
+                setRunIds(data);
+                pollHistory(data.runId, data.workflowId); // Pass the ID
             }
-            setWfState("POSTED: " + JSON.stringify(r.data.data));
         }
         else if(r.data.status === STATUS.fail){
             setWfState("FAILED: " + r.data.errors);
@@ -68,24 +89,49 @@ function App() {
         return true;
     }
 
-    const pollStatus = async (runId: string, workflowId: string) => {
-        getWorkflowStatus(runId, workflowId);
-        
-        
-        let count = 0;
-        let id = setInterval(()=>{
-            getWorkflowStatus(runId, workflowId);
-            
-            if(count++ > 10){
-                clearInterval(id);
-            }
+    const terminateWorkflow = async (): Promise<string|boolean> =>{
+        if(!runIds) return false;
 
-        }, 3000);
+        let err = null;
+
+    
+        const url = `${SERVICE_API_ROOT}/workflow/${runIds.workflowId}/${runIds.runId}/terminate`;
+        let reason = "FROM UI";
+        const r:AxiosResponse<any>|null = await axios.post(url, {reason}).catch(e=>err=e);
+        if(!r || err){
+            WARN(err);
+            return false;
+        }
+
+        LOG(r);
+        if(r.data.status === STATUS.success){
+        }
+        else if(r.data.status === STATUS.fail){
+        }
+
+        return true;
     }
 
-    const getWorkflowStatus = async (runId: string, workflowId: string) =>{
+    const pollHistory = async (runId: string, workflowId: string) => {
+        getWorkflowHistory(runId, workflowId);
+        getWorkflowStatus(runId, workflowId);
+
+        let id = setInterval(()=>{
+            getWorkflowHistory(runId, workflowId);
+            getWorkflowStatus(runId, workflowId);
+
+            if(run_s === RUNNIG_STATUS.COMPLETED || run_s === RUNNIG_STATUS.TERMINATED){
+                clearInterval(id);
+            }
+            else{
+                console.log(status)
+            }
+        }, 1000);
+    }
+
+    const getWorkflowHistory = async (runId: string, workflowId: string) =>{
         let err = null;
-        const url = `${SERVICE_API_ROOT}/workflow/${workflowId}/${runId}/status`;
+        const url = `${SERVICE_API_ROOT}/workflow/${workflowId}/${runId}/history`;
         const r:AxiosResponse<any>|null = await axios.get(url).catch(e=>err=e);
         if(!r || err){
             WARN(err);
@@ -97,10 +143,47 @@ function App() {
             if(r.data.data?.length){
                 let data = r.data.data[0];
                 let [e, h] = await decode(TemporalHistoryC, data);
-                LOG(e, h);
-                if(e) setStatus(null);
+                // LOG(e, h);
+                if(e) setHistory(null);
                 else if(h){
-                    setStatus(h.history.events);
+                    setHistory(h.history.events);
+                }
+            }
+        }
+        return;
+    }
+    const getWorkflowStatus = async (runId: string, workflowId: string) =>{
+        let err = null;
+        const url = `${SERVICE_API_ROOT}/workflow/${workflowId}/${runId}/status`;
+        const r:AxiosResponse<any>|null = await axios.get(url).catch(e=>err=e);
+        if(!r || err){
+            WARN(err);
+            return false;
+        }
+
+        if(r.data.status === STATUS.success){
+            if(r.data.data?.length){
+                let data = r.data.data[0];
+                let [e, s] = await decode(TemporalStatusC, data);
+                LOG(e, s);
+                if(e) setStatus(RUNNIG_STATUS.NONE);
+                else if(s){
+                    console.log("status is: ", s.workflowExecutionInfo.status);
+                    if(s.workflowExecutionInfo.status === "Running"){
+                        setStatus(RUNNIG_STATUS.RUNNING);
+                        run_s = RUNNIG_STATUS.RUNNING;
+                    }
+                    else if(s.workflowExecutionInfo.status === "Terminated"){
+                        setStatus(RUNNIG_STATUS.TERMINATED);
+                        run_s = RUNNIG_STATUS.TERMINATED;
+                    }
+                    else if(s.workflowExecutionInfo.status === "Completed"){
+                        setStatus(RUNNIG_STATUS.COMPLETED)
+                        run_s = RUNNIG_STATUS.COMPLETED;
+                    }
+                    else {
+                        console.error("Handle workflowExecutionInfo.status= "+ s.workflowExecutionInfo.status)
+                    }
                 }
             }
         }
@@ -119,7 +202,7 @@ function App() {
                     </tr>
                     </thead>
                     <tbody>
-                        {status && status.map((s, i) => {
+                        {history && history.map((s, i) => {
                             let evn = s.details?.activityType?.name || "";
                             if(evn) evn = ` (${evn})`;
 
@@ -144,16 +227,28 @@ function App() {
                     theme="vs-dark"
                     height="100vh"
                     defaultLanguage="yaml"
-                    defaultValue={defaultValues.simple_workflow_yaml}
+                    defaultValue={defaultValues.noops_workflow_yaml}
                     onMount={handleEditorDidMount}
                 />
                 <div className="">
+                    {(status === RUNNIG_STATUS.RUNNING) &&
+                        (<div >Pending Activity: </div>)
+                    }
                     {/* <div>Workflow State: {wfState}</div> */}
                     <button className="bg-transparent hover:bg-blue-500 text-indigo-700 font-semibold hover:text-white py-2 px-4 border border-blue-500 hover:border-transparent rounded"
                         onClick={runWorkflow}
                         >
                         Run Worflow
                     </button>
+                    {
+                        (status === RUNNIG_STATUS.RUNNING) && (
+                            <button className="bg-transparent hover:bg-red-500 text-indigo-700 font-semibold hover:text-white py-2 px-4 border border-red-500 hover:border-transparent rounded"
+                                onClick={terminateWorkflow}
+                                >
+                                Terminate
+                            </button>
+                        )
+                    }
                     <StatusList></StatusList>
                 
                 </div>
