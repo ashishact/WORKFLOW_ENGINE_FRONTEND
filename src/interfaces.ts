@@ -52,20 +52,23 @@ export enum STATUS {
     success = "success",
     fail = "fail"
 }
+export const HistoryEventTypeC = t.union([
+    t.literal("WorkflowExecutionStarted"),
+    t.literal("WorkflowTaskScheduled"),
+    t.literal("WorkflowTaskStarted"),
+    t.literal("WorkflowTaskCompleted"),
+    t.literal("ActivityTaskScheduled"),
+    t.literal("ActivityTaskStarted"),
+    t.literal("ActivityTaskCompleted"),
+    t.literal("WorkflowExecutionCompleted"),
+    t.literal("WorkflowTaskFailed"),
+    t.literal("ERROR"),
+]);
+export type HistoryEventTypeI = t.TypeOf<typeof HistoryEventTypeC>;
 
 export const TemporalHistoryEventC = t.type({
         eventTime: t.string,
-        eventType: t.union([
-            t.literal("WorkflowExecutionStarted"),
-            t.literal("WorkflowTaskScheduled"),
-            t.literal("WorkflowTaskStarted"),
-            t.literal("WorkflowTaskCompleted"),
-            t.literal("ActivityTaskScheduled"),
-            t.literal("ActivityTaskStarted"),
-            t.literal("ActivityTaskCompleted"),
-            t.literal("WorkflowExecutionCompleted"),
-            t.literal("WorkflowTaskFailed"),
-        ]),
+        eventType: HistoryEventTypeC,
         eventId: t.string,
         details: t.any
 })
@@ -91,10 +94,12 @@ export const TemporalStatusC = t.type({
                 message: t.string,
                 source: t.string
             })
-        ])
+        ]),
+        scheduledTime: t.union([t.string, t.null]),
     })),
     workflowExecutionInfo: t.type({
         startTime: t.string,
+        closeTime: t.union([t.string, t.null]),
         status: t.string,
         historyLength: t.string,
         executionTime: t.string

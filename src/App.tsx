@@ -1,5 +1,4 @@
 import React, {useState, useRef, useEffect}      from 'react';
-import logo                 from './logo.svg';
 import './App.css';
 
 import Editor               from "@monaco-editor/react";
@@ -7,13 +6,25 @@ import axios,
     {AxiosResponse}         from "axios";
 
 
+    
+
+
 import {STATUS, decode, 
     TemporalHistoryC,
     TemporalHistoryEventI,
     TemporalStatusC,
-    TemporalStatusI
+    TemporalStatusI,
+    HistoryEventTypeI,
+    TemporalHistoryI
 }                           from "./interfaces";
 import defaultValues                from "./default_values";
+
+
+import History from "./History";
+import HistoryAsCode from "./HistoryAsCode";
+import TaskTable from  "./TaskTable"
+import PendingActivity from "./PendingActivity";
+
 
 const WARN  = console.warn;
 const LOG   = console.log;
@@ -37,10 +48,12 @@ let run_s:RUNNIG_STATUS = RUNNIG_STATUS.NONE;
 function App() {
 
     const editorRef = useRef<any>(null);
-    const [wfState, setWfState] = useState<string>("BEFORE INIT");
-    const [history, setHistory] = useState<TemporalHistoryEventI[]|null>([]);
+    const [history, setHistory] = useState<TemporalHistoryI|null>(null);
+    const [temporalStatus, setTemporalStatus] = useState<TemporalStatusI|null>(null);
+
     const [status, setStatus] = useState<RUNNIG_STATUS>(RUNNIG_STATUS.NONE);
     const [runIds, setRunIds] = useState<any>(null);
+    const [pending, setPending] = useState<string[]>([]);
 
 
     useEffect(() => {
@@ -68,23 +81,22 @@ function App() {
             return false;
         }
         
-        setWfState("POSTED: " + JSON.stringify(r.data.data));
-        setStatus(RUNNIG_STATUS.NONE);
         setHistory(null);
 
         LOG(r);
         if(r.data.status === STATUS.success){
             if(r.data.data?.length){
                 let data = r.data.data[0];
-                setRunIds(data);
-                pollHistory(data.runId, data.workflowId); // Pass the ID
+                if(data){
+                    setRunIds(data);
+                    pollHistory(data.runId, data.workflowId); // Pass the ID
+                    setStatus(RUNNIG_STATUS.RUNNING);
+                }
             }
         }
         else if(r.data.status === STATUS.fail){
-            setWfState("FAILED: " + r.data.errors);
+            // setWfState("FAILED: " + r.data.errors);
         }
-
-       
 
         return true;
     }
@@ -144,9 +156,11 @@ function App() {
                 let data = r.data.data[0];
                 let [e, h] = await decode(TemporalHistoryC, data);
                 // LOG(e, h);
-                if(e) setHistory(null);
+                if(e) {
+                    // setHistory(null);
+                }
                 else if(h){
-                    setHistory(h.history.events);
+                    setHistory(h);
                 }
             }
         }
@@ -168,6 +182,7 @@ function App() {
                 LOG(e, s);
                 if(e) setStatus(RUNNIG_STATUS.NONE);
                 else if(s){
+                    setTemporalStatus(s);
                     console.log("status is: ", s.workflowExecutionInfo.status);
                     if(s.workflowExecutionInfo.status === "Running"){
                         setStatus(RUNNIG_STATUS.RUNNING);
@@ -190,67 +205,53 @@ function App() {
         return;
     }
 
-    const StatusList = ()=>{
-        return (
-            <div className="rounded-t-xl overflow-hidden bg-gradient-to-r from-pink-50 to-purple-100">
-                <table className="table-auto">
-                    <thead>
-                    <tr>
-                        <th>Id</th>
-                        <th>Type</th>
-                        <th>Time</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                        {history && history.map((s, i) => {
-                            let evn = s.details?.activityType?.name || "";
-                            if(evn) evn = ` (${evn})`;
+    
 
-                            return (<tr key={i}>
-                                <td className="border border-green-500 px-4 py-2 text-green-600 font-small">{s.eventId}</td>
-                                <td className="border border-green-500 px-4 py-2 text-green-600 font-small">
-                                    {s.eventType + evn}
-                                </td>
-                                <td className="border border-green-500 px-4 py-2 text-green-600 font-small">{s.eventTime}</td>
-                            </tr>)
-                        })}
-                    </tbody>
-                </table>
-            </div>
-        )
-    }
+    
 
     return (
         <div className="container mx-auto">
-            <div className="grid grid-cols-2">
-                <Editor
-                    theme="vs-dark"
-                    height="100vh"
-                    defaultLanguage="yaml"
-                    defaultValue={defaultValues.noops_workflow_yaml}
-                    onMount={handleEditorDidMount}
-                />
-                <div className="">
-                    {(status === RUNNIG_STATUS.RUNNING) &&
-                        (<div >Pending Activity: </div>)
-                    }
-                    {/* <div>Workflow State: {wfState}</div> */}
-                    <button className="bg-transparent hover:bg-blue-500 text-indigo-700 font-semibold hover:text-white py-2 px-4 border border-blue-500 hover:border-transparent rounded"
-                        onClick={runWorkflow}
-                        >
-                        Run Worflow
-                    </button>
-                    {
-                        (status === RUNNIG_STATUS.RUNNING) && (
-                            <button className="bg-transparent hover:bg-red-500 text-indigo-700 font-semibold hover:text-white py-2 px-4 border border-red-500 hover:border-transparent rounded"
-                                onClick={terminateWorkflow}
-                                >
-                                Terminate
-                            </button>
-                        )
-                    }
-                    <StatusList></StatusList>
+            <div className="grid grid-cols-3 text-center pt-1 pl-1">
+                <select className="col-span-2 bg-gray-500 text-white active:bg-pink-300 font-bold uppercase text-sm rounded shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150">
+                    <option value="">A</option>
+                    <option value="">B</option>
+                </select>
+
+
+                {
+                    (status !== RUNNIG_STATUS.RUNNING) && 
+                    <button className="col-span-1 bg-green-500 text-white active:bg-pink-600 font-bold uppercase text-sm px-6 py-3 rounded shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150" type="button" onClick={runWorkflow}>Run</button>
+                }
+
+                {
+                    (status === RUNNIG_STATUS.RUNNING) && 
+                    <button className="col-span-1 bg-pink-500 text-white active:bg-pink-600 font-bold uppercase text-sm px-6 py-3 rounded shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150" type="button" onClick={terminateWorkflow}>Terminate</button>
+
+                }
                 
+            </div>
+                
+            <div className="grid grid-cols-2">
+                <div className="container mx-auto">
+                    <Editor
+                        options={{
+                            scrollbar: {
+                                vertical: 'hidden'
+                            },
+                        }}
+                        theme="vs-dark"
+                        height="100vh"
+                        defaultLanguage="yaml"
+                        defaultValue={defaultValues.noops_workflow_yaml}
+                        onMount={handleEditorDidMount}/>
+                
+                </div>
+
+
+                
+                <div className="container mx-auto p-0">
+                    <PendingActivity activity={pending} ></PendingActivity>
+                    <HistoryAsCode history={history} status={temporalStatus}></HistoryAsCode>
                 </div>
             </div>
         </div>
