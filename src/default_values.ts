@@ -1,4 +1,32 @@
-const simple_workflow_yaml = `# Example 1 - HTTP call
+interface WF_YAML {
+    name: string,
+    code: string,
+}
+
+const wf_yaml:WF_YAML[] = [];
+
+
+
+let y:WF_YAML = {name : "", code: ""};
+y.name = "01 - Hello World";
+y.code = `
+# 01 - Hello World
+# ! Not Working
+---
+name: "Hello World"
+main:
+    step_one: 
+        return: "Hello World"
+`
+wf_yaml.push(y);
+
+
+
+
+
+
+const simple_workflow_yaml = `
+# Example 1 - HTTP call
 ---
 main:
   step1:
@@ -17,6 +45,5 @@ main:
     args:
       seconds: 4`
 export default {
-    simple_workflow_yaml,
-    noops_workflow_yaml
+    wf_yaml
 }

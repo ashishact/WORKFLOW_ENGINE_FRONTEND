@@ -6,7 +6,7 @@ import axios,
     {AxiosResponse}         from "axios";
 
 
-    
+import {getRunninWorkflows} from "./temporalApi"
 
 
 import {STATUS, decode, 
@@ -20,10 +20,10 @@ import {STATUS, decode,
 import defaultValues                from "./default_values";
 
 
-import History from "./History";
-import HistoryAsCode from "./HistoryAsCode";
-import TaskTable from  "./TaskTable"
-import PendingActivity from "./PendingActivity";
+import History                  from "./History";
+import HistoryAsCode            from "./HistoryAsCode";
+import TaskTable                from  "./TaskTable"
+import PendingActivity          from "./PendingActivity";
 
 
 const WARN  = console.warn;
@@ -39,6 +39,7 @@ interface StatusI{
 enum RUNNIG_STATUS {
     NONE,
     RUNNING,
+    FAILED,
     COMPLETED,
     TERMINATED
 }
@@ -56,17 +57,27 @@ function App() {
     const [pending, setPending] = useState<string[]>([]);
 
 
-    useEffect(() => {
-        
-    }, [status]);
-
     const handleEditorDidMount = (editor:any , monaco: any) => {
         editorRef.current = editor; 
+        console.log(editor, monaco);
+        
+        // document.addEventListener("keyup", async (e)=>{
+        //     if(e.key == "Enter"){
+        //         let src = editor.getValue();
+        //         if(src && src.match("temporal.get.open")){
+        //             console.log("Fetching all open workflows");
+        //             let r = await getRunninWorkflows();
+        //             console.log(r);
+        //         }
+        //     }
+        // })
     }
+
     const getCode = (): string|null => {
         if(!editorRef.current) return null;
         return editorRef.current.getValue();
     }
+
 
     const runWorkflow = async (): Promise<string|boolean> =>{
         let err = null;
@@ -132,7 +143,7 @@ function App() {
             getWorkflowHistory(runId, workflowId);
             getWorkflowStatus(runId, workflowId);
 
-            if(run_s === RUNNIG_STATUS.COMPLETED || run_s === RUNNIG_STATUS.TERMINATED){
+            if(run_s !== RUNNIG_STATUS.RUNNING){
                 clearInterval(id);
             }
             else{
@@ -153,13 +164,8 @@ function App() {
         if(r.data.status === STATUS.success){
             // setStatus(JSON.stringify(r.data.data, null, 2));
             if(r.data.data?.length){
-                let data = r.data.data[0];
-                let [e, h] = await decode(TemporalHistoryC, data);
-                // LOG(e, h);
-                if(e) {
-                    // setHistory(null);
-                }
-                else if(h){
+                let h = r.data.data[0];
+                if(h){
                     setHistory(h);
                 }
             }
@@ -177,13 +183,11 @@ function App() {
 
         if(r.data.status === STATUS.success){
             if(r.data.data?.length){
-                let data = r.data.data[0];
-                let [e, s] = await decode(TemporalStatusC, data);
-                LOG(e, s);
-                if(e) setStatus(RUNNIG_STATUS.NONE);
-                else if(s){
+                let s = r.data.data[0];
+                // let [e, s] = await decode(TemporalStatusC, data);
+                if(s){
                     setTemporalStatus(s);
-                    console.log("status is: ", s.workflowExecutionInfo.status);
+                    // console.log("status is: ", s.workflowExecutionInfo.status);
                     if(s.workflowExecutionInfo.status === "Running"){
                         setStatus(RUNNIG_STATUS.RUNNING);
                         run_s = RUNNIG_STATUS.RUNNING;
@@ -196,6 +200,10 @@ function App() {
                         setStatus(RUNNIG_STATUS.COMPLETED)
                         run_s = RUNNIG_STATUS.COMPLETED;
                     }
+                    else if(s.workflowExecutionInfo.status === "Failed"){
+                        setStatus(RUNNIG_STATUS.FAILED);
+                        run_s = RUNNIG_STATUS.FAILED;
+                    }
                     else {
                         console.error("Handle workflowExecutionInfo.status= "+ s.workflowExecutionInfo.status)
                     }
@@ -204,8 +212,6 @@ function App() {
         }
         return;
     }
-
-    
 
     
 
@@ -242,15 +248,15 @@ function App() {
                         theme="vs-dark"
                         height="100vh"
                         defaultLanguage="yaml"
-                        defaultValue={defaultValues.noops_workflow_yaml}
+                        defaultValue={defaultValues.wf_yaml[0].code}
                         onMount={handleEditorDidMount}/>
+                        
                 
                 </div>
 
 
                 
                 <div className="container mx-auto p-0">
-                    <PendingActivity activity={pending} ></PendingActivity>
                     <HistoryAsCode history={history} status={temporalStatus}></HistoryAsCode>
                 </div>
             </div>

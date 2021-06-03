@@ -7,14 +7,6 @@ import dayjs from 'dayjs'
 import {HistoryEventTypeI, TemporalHistoryI, TemporalStatusI}  from "./interfaces";
 
 
-// interface Props {
-//     history: {
-//         type: HistoryEventTypeI
-//         time: string,
-//         message: string
-//     }[]
-// }
-
 interface Props {
     history: TemporalHistoryI|null,
     status: TemporalStatusI|null
