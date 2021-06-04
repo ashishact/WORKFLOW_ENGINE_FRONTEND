@@ -19,7 +19,7 @@ const HistoryAsCode = (props: Props) => {
     const handleEditorDidMount = (editor:any , monaco: any) => {
         editorRef.current = editor; 
     }
-    let text = `START LOGS\n==========\n\n`;
+    let text = `START LOGS\n`;
 
 
     const findActivityDetails = (eventId: string):any => {
@@ -38,6 +38,42 @@ const HistoryAsCode = (props: Props) => {
         return j;
     }
 
+    if(status){
+        if(status.pendingActivities?.length){
+            let pending = "";
+            for(let pa of status.pendingActivities){
+
+                pending += "PENDING => " + JSON.stringify({
+                    Name: pa.activityType?.name,
+                    scheduledTime: pa.scheduledTime,
+                    lastFailure: {
+                        message: pa.lastFailure?.message
+                    },
+                    attempt: pa.attempt,
+                    maximumAttempts: pa.maximumAttempts,
+                }, null, 2) + "\n";
+            }
+
+            if(pending){
+                text += pending;
+            }
+        }
+
+        if(status.workflowExecutionInfo){
+            text += "\n\n=======================\n";
+            let i = status.workflowExecutionInfo;
+            let j = {
+                executionTime: i.executionTime,
+                status: i.status.toUpperCase(),
+                startTime: i.startTime,
+                closeTime: i.closeTime,
+            }
+            text += "EXECUTION INFO => " + JSON.stringify(j, null, 2);
+        }
+    }
+
+    text += "\n=======================\n\n";
+
     if(history){
         for(let e of history.history.events){
             let t = null;
@@ -45,7 +81,9 @@ const HistoryAsCode = (props: Props) => {
                 t = dayjs(e.eventTime).format("YY MMM DD, HH:mm:ss")  + " : [ActivityStarted] => ";
                 let j = findActivityDetails(e.details.scheduledEventId);
                 if(j){
-                    t += JSON.stringify(j, null, 2) + "\n";
+                    if(Array.isArray(j) && j.length) j = j[0];
+                    let {Name, Call, Result, Return} = j;
+                    t += JSON.stringify({Name, Call, Result, Return}, null, 2) + "\n";
                 }
                 else{
                     t += JSON.stringify(e, null, 2) + "\n";
@@ -59,7 +97,7 @@ const HistoryAsCode = (props: Props) => {
                     j = {
                         Name: j.Name,
                         Call: j.Call,
-                        result: e.details.result
+                        Result: JSON.parse(e.details?.result?.payloads)
                     }
                     t += JSON.stringify(j, null, 2) + "\n";
                 }
@@ -69,9 +107,10 @@ const HistoryAsCode = (props: Props) => {
             }
             else if(e.eventType === "WorkflowExecutionCompleted"){
                 t = dayjs(e.eventTime).format("YY MMM DD, HH:mm:ss") + " : [WorkflowExecutionCompleted] => ";
-                let j = {result: e.details?.result};
-                if(j){
-                    t += JSON.stringify(j, null, 2) + "\n";
+
+                let result = e.details?.result?.payloads;
+                if(result){
+                    t += JSON.stringify({result}, null, 2) + "\n";
                 }
                 else{
                     t += JSON.stringify(e, null, 2) + "\n";
@@ -79,49 +118,22 @@ const HistoryAsCode = (props: Props) => {
             }
             if(t) text += t + "\n";
         }
-
-        if(status){
-            if(status.pendingActivities?.length){
-                let pending = "";
-                for(let pa of status.pendingActivities){
-
-                    pending += "PENDING => " + JSON.stringify({
-                        Name: pa.activityType?.name,
-                        scheduledTime: pa.scheduledTime,
-                        lastFailure: {
-                            message: pa.lastFailure?.message
-                        },
-                        attempt: pa.attempt,
-                        maximumAttempts: pa.maximumAttempts,
-                    }, null, 2) + "\n";
-                }
-
-                if(pending){
-                    text += pending;
-                }
-            }
-
-            if(status.workflowExecutionInfo){
-                text += "\n\n=======================\n";
-                let i = status.workflowExecutionInfo;
-                let j = {
-                    executionTime: i.executionTime,
-                    status: i.status,
-                    startTime: i.startTime,
-                    closeTime: i.closeTime,
-                }
-                text += "EXECUTION INFO => " + JSON.stringify(j, null, 2);
-            }
+    }
 
 
-            text += "\n\n=======================\n";
-            text += "FULL STATUS => " + JSON.stringify(status, null, 2);
-        }
+    if(status){
+        text += "\n\n=======================\n";
+        text += "FULL STATUS => " + JSON.stringify(status, null, 2);
+    }
 
+
+    if(history){
         text += "\n\n=======================\n";
         text += "FULL HISTORY => ";
         text +=  JSON.stringify(history, null, 2);
     }
+
+
     if(editorRef.current){
         editorRef.current.setValue(text);
     }

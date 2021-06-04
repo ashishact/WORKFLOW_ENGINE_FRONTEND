@@ -1,15 +1,21 @@
-import React, {useState, useRef, useEffect}      from 'react';
 import './App.css';
+import React, {
+    useState, 
+    useRef, 
+    useEffect
+}                           from 'react';
 
 import Editor               from "@monaco-editor/react";
-import axios, 
-    {AxiosResponse}         from "axios";
+import axios, {
+    AxiosResponse
+}                           from "axios";
 
+import {
+    getRunninWorkflows
+}                           from "./temporalApi"
 
-import {getRunninWorkflows} from "./temporalApi"
-
-
-import {STATUS, decode, 
+import {
+    STATUS, decode, 
     TemporalHistoryC,
     TemporalHistoryEventI,
     TemporalStatusC,
@@ -17,19 +23,21 @@ import {STATUS, decode,
     HistoryEventTypeI,
     TemporalHistoryI
 }                           from "./interfaces";
-import defaultValues                from "./default_values";
+import example_workflows    from "./example_workflow";
 
 
-import History                  from "./History";
-import HistoryAsCode            from "./HistoryAsCode";
-import TaskTable                from  "./TaskTable"
-import PendingActivity          from "./PendingActivity";
+
+
+import History              from "./History";
+import HistoryAsCode        from "./HistoryAsCode";
+import TaskTable            from  "./TaskTable"
+import PendingActivity      from "./PendingActivity";
 
 
 const WARN  = console.warn;
 const LOG   = console.log;
 
-const SERVICE_API_ROOT = "http://localhost:3014/api/v1";
+const SERVICE_API_ROOT = process.env.REACT_APP_WFE_API_SERVER_ROOT || "http://localhost:3014/api/v1";
 
 interface StatusI{
     id: string,
@@ -59,18 +67,7 @@ function App() {
 
     const handleEditorDidMount = (editor:any , monaco: any) => {
         editorRef.current = editor; 
-        console.log(editor, monaco);
-        
-        // document.addEventListener("keyup", async (e)=>{
-        //     if(e.key == "Enter"){
-        //         let src = editor.getValue();
-        //         if(src && src.match("temporal.get.open")){
-        //             console.log("Fetching all open workflows");
-        //             let r = await getRunninWorkflows();
-        //             console.log(r);
-        //         }
-        //     }
-        // })
+        // console.log(editor, monaco);
     }
 
     const getCode = (): string|null => {
@@ -213,14 +210,30 @@ function App() {
         return;
     }
 
+
+    const yamlSelected = (e: any)=>{
+        if(!editorRef.current) return;
+
+        let i = e.target.value;
+        let yamls = example_workflows.yamls;
+        if(i < yamls.length ){
+            editorRef.current.setValue(yamls[i].code);
+        }
+    }
+
     
 
     return (
         <div className="container mx-auto">
             <div className="grid grid-cols-3 text-center pt-1 pl-1">
-                <select className="col-span-2 bg-gray-500 text-white active:bg-pink-300 font-bold uppercase text-sm rounded shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150">
-                    <option value="">A</option>
-                    <option value="">B</option>
+                <select className="col-span-2 bg-gray-500 text-white active:bg-pink-300 font-bold uppercase text-sm rounded shadow hover:shadow-lg outline-none focus:outline-none pl-4 mr-1 mb-1 ease-linear transition-all duration-150"
+                onChange={yamlSelected}
+                >
+                    {
+                        example_workflows.yamls.map((y, i)=>(
+                            <option key={i} value={i}>{y.name}</option>
+                        ))
+                    }
                 </select>
 
 
@@ -248,7 +261,7 @@ function App() {
                         theme="vs-dark"
                         height="100vh"
                         defaultLanguage="yaml"
-                        defaultValue={defaultValues.wf_yaml[0].code}
+                        defaultValue={example_workflows.yamls[0].code}
                         onMount={handleEditorDidMount}/>
                         
                 
