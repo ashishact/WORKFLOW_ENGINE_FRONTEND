@@ -97,8 +97,12 @@ const HistoryAsCode = (props: Props) => {
                     j = {
                         Name: j.Name,
                         Call: j.Call,
-                        Result: JSON.parse(e.details?.result?.payloads)
+                        Result: e.details?.result?.payloads
                     }
+                    try {
+                        let r = JSON.parse(j.Result);
+                        j.Result = r;
+                    } catch (error) {}
                     t += JSON.stringify(j, null, 2) + "\n";
                 }
                 else{

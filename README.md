@@ -1,3 +1,28 @@
+# WORFKLOW ENGINE FRONTEND
+
+`A Google step function clone written in Go and Typescript`
+
+@depends on: https://github.com/ashishact/WORKFLOW_ENGINE_API_SERVER
+
+This is the repo for the editing the workflow files and monitoring status/logs
+
+
+## Development
+```bash
+npm install
+# create a .env.production.local file with
+REACT_APP_WFE_API_SERVER_ROOT=http://localhost:3014/api/v1
+
+if WFE_API_SERVER is running on port 3014
+
+
+npm start
+```
+
+
+
+
+
 # Getting Started with Create React App
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
