@@ -20,6 +20,7 @@ npm start
 ```
 
 
+Read the development notes here: https://workflow-engine-frontend.s3.ap-south-1.amazonaws.com/docs/workflow_engine_development_notes.pdf
 
 
 
