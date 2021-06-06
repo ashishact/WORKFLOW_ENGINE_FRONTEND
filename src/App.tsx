@@ -52,7 +52,14 @@ enum RUNNIG_STATUS {
     TERMINATED
 }
 
+interface WorkflowSubmitResult{
+    error: string|null
+    runId: string,
+    workflowId: string
+}
+
 let run_s:RUNNIG_STATUS = RUNNIG_STATUS.NONE;
+let polling_timer:any = 0;
 
 function App() {
 
@@ -63,6 +70,8 @@ function App() {
     const [status, setStatus] = useState<RUNNIG_STATUS>(RUNNIG_STATUS.NONE);
     const [runIds, setRunIds] = useState<any>(null);
     const [pending, setPending] = useState<string[]>([]);
+    
+    const [submitResult, setSubmitResult] = useState<WorkflowSubmitResult|null>(null);
 
 
     const handleEditorDidMount = (editor:any , monaco: any) => {
@@ -81,6 +90,14 @@ function App() {
 
         const yaml = getCode();
         if(!yaml) return false;
+
+
+        
+        setHistory(null);
+        setTemporalStatus(null);
+        clearInterval(polling_timer);
+        setStatus(RUNNIG_STATUS.NONE);
+
         
         const url = `${SERVICE_API_ROOT}/workflow/${1}/run`;
         const r:AxiosResponse<any>|null = await axios.post(url, {yaml}).catch(e=>err=e);
@@ -89,21 +106,30 @@ function App() {
             return false;
         }
         
-        setHistory(null);
+        
 
         LOG(r);
         if(r.data.status === STATUS.success){
             if(r.data.data?.length){
                 let data = r.data.data[0];
                 if(data){
+                    let runid:string = data.runId;
+                    let wfid:string = data.workflowId;
                     setRunIds(data);
-                    pollHistory(data.runId, data.workflowId); // Pass the ID
+                    pollHistory(runid, wfid); // Pass the ID
                     setStatus(RUNNIG_STATUS.RUNNING);
+                    gotNewSubmitResult({runId: runid, workflowId: wfid, error: null});
                 }
+                else{
+                    gotNewSubmitResult({runId: "0", workflowId: "0", error: "FAILED TO RUN WORKFLOW"});
+                }
+            }
+            else{
+                gotNewSubmitResult({runId: "0", workflowId: "0", error: "FAILED TO RUN WORKFLOW"});
             }
         }
         else if(r.data.status === STATUS.fail){
-            // setWfState("FAILED: " + r.data.errors);
+            gotNewSubmitResult({runId: "0", workflowId: "0", error: r.data.errors[0]});
         }
 
         return true;
@@ -136,12 +162,12 @@ function App() {
         getWorkflowHistory(runId, workflowId);
         getWorkflowStatus(runId, workflowId);
 
-        let id = setInterval(()=>{
+        polling_timer = setInterval(()=>{
             getWorkflowHistory(runId, workflowId);
             getWorkflowStatus(runId, workflowId);
 
             if(run_s !== RUNNIG_STATUS.RUNNING){
-                clearInterval(id);
+                clearInterval(polling_timer);
             }
             else{
                 console.log(status)
@@ -221,6 +247,13 @@ function App() {
         }
     }
 
+    const gotNewSubmitResult = (sr: WorkflowSubmitResult) => {
+        setSubmitResult(sr);
+
+        setTimeout(()=>{
+            setSubmitResult(null); // clear
+        }, sr.error?5000:2000);
+    }
     
 
     return (
@@ -272,6 +305,31 @@ function App() {
                 <div className="container mx-auto p-0">
                     <HistoryAsCode history={history} status={temporalStatus}></HistoryAsCode>
                 </div>
+
+                {
+                    (submitResult && submitResult.error) && 
+                    <div role="alert" className="absolute top-16 right-4 transform">
+                        <div className="bg-red-500 text-white font-bold rounded-t px-4 py-2">
+                            Error
+                        </div>
+                        <div className="border border-t-0 border-red-400 rounded-b bg-red-100 px-4 py-3 text-red-700">
+                            <p>{submitResult.error}</p>
+                        </div>
+                    </div>
+                }
+                
+                {
+                    (submitResult && !submitResult.error) && 
+                    <div role="alert" className="absolute top-16 right-4 transform">
+                        <div className="bg-blue-500 text-white font-bold rounded-t px-4 py-2">
+                            Workflow Submited
+                        </div>
+                        <div className="border border-t-0 border-blue-400 rounded-b bg-blue-100 px-4 py-3 text-blue-700">
+                            <p>WORKFLOW ID: {submitResult.workflowId},  RUN ID: {submitResult.runId}</p>
+                        </div>
+                    </div>
+                }
+
             </div>
         </div>
     );

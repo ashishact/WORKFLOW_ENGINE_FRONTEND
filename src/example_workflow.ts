@@ -9,7 +9,17 @@ const yamls:WF_YAML[] = [];
 
 yamls.push({name : "01 - Hello World", code: `
 # 01 - Hello World
+
+# 1. Click on RUN (top right) and this workflow will be executed
+# 2. If it fails or takes longer than expected click on the TERMINATE Button
+# 3. Logs will be displayed at the right half
+# 4. Check  EXECUTION INFO => "status": COMPLETED | FAILED | TERMINATED
+# 5. Results is displayed at the end on WorkflowExecutionCompleted 
+# 6. There is also the FULL STATUS and FULL HISTORY of execution (scroll down to see)
+# 7. If you are not able to run a workflow => RELOAD the page and try again
+
 ---
+
 name: "Hello World"
 main:
   step_one: 
@@ -19,7 +29,12 @@ main:
 
 yamls.push({name : "02 - Call a activity", code: `
 # 02 - Call a activity
+
+# 1. If you don't provide a valid number for "seconds" . Then the workflow will faill and it will try again. But then it will fail again
+# 2. The default execution timeout is 10 seconds for each step so make sure "seconds" < 10 for the task to be successful
+# 3. If "seconds" > 10 check the timeout example how to set timeouts
 ---
+
 name: "Sleep"
 main:
   step_one: 
@@ -31,7 +46,11 @@ main:
 
 yamls.push({name : "03 - Http Get", code: `
 # 03 - Http Get
+
+# 1. Here first te result is stored into a vraiable called "currentTime"
+# 2. Unlike Google workflow we don't have to use \${currentTime.dayOfTheWeek}
 ---
+
 main:
   getDayOfWeek:
     call: http.get
@@ -44,6 +63,13 @@ main:
 
 yamls.push({name : "04 - Assign Variable", code: `
 # 04 - Assign Variable
+
+# 1. Assignment is ordered so we can use variables defined before in this steps or previous steps
+# 2. For string literal use double quotes i.e =>
+# 3. string constant  =>  value: "name"
+# 4. variable         =>  value: name  # note; name must be defined before
+
+---
 name: "Assign Variable"
 main:
   step_one:
@@ -57,6 +83,9 @@ main:
 
 yamls.push({name : "05 - Expression in Arguments", code: `
 # 05 - Expression in Arguments
+
+# 1. We use \${var} only within strings everywhere else we can just use var  
+---
 name: "Expression in arguments"
 main:
   step_zero:
@@ -75,6 +104,9 @@ main:
 
 yamls.push({name : "06 - Switch Condition", code: `
 # 06 - Switch Condition
+
+# 1. condition takes any valid javascript code
+---
 name: "Jump based on switch condition"
 main:
     getCurrentTime:
@@ -114,32 +146,43 @@ main:
 `});
 
 
-yamls.push({name : "07 - Match", code: `
-# 07 - Match
-name: "Expression in arguments"
-main:
-  step_zero:
-    assign:
-      key: "6132d68042e14b1f87e190827210306"
-      city: "Tokyo"
+yamls.push({name : "07 - Array and Loop", code: `
+# 07 - Array and Loop
 
-  step_two_getWeather:
-    call: http.get
-    args:
-      url: http://api.weatherapi.com/v1/current.json?key=\${key}&q=\${city}
-    result: weather
-  
-  step_three:
-    match:
-      on: weather.current.temp_c
-      conditions:
-        - (t = )
+# 1. There is a limit to how much you can loop through -> It's done to protect the workers from going into infinite loops
+# 2. Maximum number steps is set to 100 
+# 3. Or 10 times the number of steps in this workflow
+---
+
+name: "Array and Loop"
+main:
+  define:
+    assign:
+      array: ["foo", "ba", "r"]
+      result: ""
+      i: 0
+  check_condition:
+    switch:
+      - condition: array.length > i
+        next: iterate
+    next: exit_loop
+  iterate:
+    assign:
+      result: result + array[i]
+      i: i+1
+    next: check_condition
+  exit_loop:
+    return: result
 `});
 
 
 yamls.push({name : "08 - Match Expression", code: `
 # 08 - Match Expression
+
+# 1. See: https://github.com/z-pattern-matching/z for how to use
+# 2. Basic idea is match things on value and execute a predicate
 ---
+
 name: "Match Expression"
 main:
   step_zero:
@@ -160,26 +203,47 @@ main:
 `});
 
 
-yamls.push({name : "08 - Match Expression Tail", code: `
-# 08 - Match Expression Tail
+yamls.push({name : "09 - Match Expression Array Tail", code: `
+# 09 - Match Expression Array Tail
+
+# 1. The idea is taken from functional languages (Haskel/Ocaml) and can be quite prowerful sometimes
 ---
-name: "Match Expression Tail"
+
+name: "Match Expression Array Tail"
 main:
   step_two:
     assign:
-        person: { name: 'Maria'}
-        ages: [24, 25, 26, 27, 28]
+        numbers: [24, 25, 26, 27, 28]
     match:
-        on: ages
+        on: numbers
         conditions:
-            - (x = person)      => value = 1
-            - (a1, a2, rest)    => value = rest
+            - (a1, a2, rest)    => withoutFirstTwo = rest
+    return: withoutFirstTwo
+`});
+
+
+yamls.push({name : "10 - Match Expression Object Props", code: `
+# 10 - Match Expression Object Props
+
+# 1. We should be able to use (x = {country: 'Japan'}) directly but it give yaml error
+---
+name: "Match Expression Object Props"
+main:
+  step_two:
+    assign:
+        person: { name: 'Maria', age: 27, country: 'Japan'}
+        country: {country: 'India'}
+    match:
+        on: person
+        conditions:
+            - (x = country)     => value = 'You are from Japan'
+            - (x)               => value = 'You are from ' + x.country
     return: value
 `});
 
 
-yamls.push({name : "03 - Check If Valid Date", code: `
-# 03 - Check If Valid Date
+yamls.push({name : "11 - Check If Valid Date", code: `
+# 11 - Check If Valid Date
 ---
 main:
     getDayOfWeek:
@@ -206,8 +270,10 @@ main:
 `});
 
 
-yamls.push({name : "02 - Timeout", code: `
-# 02 - Timeout
+yamls.push({name : "12 - Timeout", code: `
+# 12 - Timeout
+
+# 1. This will fail as we are trying to sleep for 10 seconds but the timeout is 5 sec
 ---
 name: "Sleep"
 timeout: 5
@@ -219,8 +285,38 @@ main:
 `});
 
 
-yamls.push({name : "- Retry whne service unavailable", code: `
-# - Retry whne service unavailable
+yamls.push({name : "13 - Dictionary", code: `
+# 13 - Dictionary
+---
+name: "Dictionary"
+main:
+  createDictionary:
+    assign:
+      myDictionary: {FirstName: "John", LastName: "Smith", Age: 26, Address: { Street: "Flower Road 12", City: "Superville", Country: "Atlantis"}}
+  finally:
+    return: myDictionary.Address.Country
+`});
+
+
+yamls.push({name : "14 - Wikipedia search", code: `
+# 14 - Wikipedia search
+---
+name: "Wikipedia search"
+main:
+  getDayOfWeek:
+    call: http.get
+    args:
+      url: https://us-central1-workflowsample.cloudfunctions.net/datetime
+    result: currentTime
+  prepareParam:
+    assign:
+      search: currentTime.dayOfTheWeek
+  readWikipedia:
+    call: http.get
+    args:
+      url: https://en.wikipedia.org/w/api.php?action=opensearch&search=\${search}&limit=10&namespace=0&format=json
+    result: wikipediaResult
+    return: wikipediaResult
 `});
 
 
